@@ -127,7 +127,13 @@
     "preview": "black_skeleton_only",
     "confidence_threshold": null,
     "duplicate_suppression_enabled": true,
-    "cooldown_seconds": 0.5,
+    "confirmation_frames": 4,
+    "neutral_release_frames": 8,
+    "cooldown_seconds": 0.8,
+    "front_kick_thresholds": {
+      "landmark_visibility": 0.35,
+      "rule": "same_side_knee_y_above_hip_y"
+    },
     "frame_skip": 2,
     "tracking_loss_timeout_ms": null
   },

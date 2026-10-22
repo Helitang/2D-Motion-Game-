@@ -2,11 +2,11 @@ const REQUIRED_LANDMARKS = [11, 12, 23, 24];
 const ACTIONS = ['leftPunch', 'rightPunch', 'leftKick', 'rightKick'];
 const VISIBILITY_THRESHOLD = 0.6;
 
-function visible(landmarks, indices) {
+function visible(landmarks, indices, threshold = VISIBILITY_THRESHOLD) {
   return indices.every((index) => {
     const point = landmarks[index];
     return point && Number.isFinite(point.x) && Number.isFinite(point.y)
-      && (point.visibility ?? 0) >= VISIBILITY_THRESHOLD;
+      && (point.visibility ?? 0) >= threshold;
   });
 }
 
@@ -55,7 +55,11 @@ export function classifyPose(landmarks) {
   const hipWidth = distance(landmarks[23], landmarks[24]) / torsoHeight;
   const shoulderSkew = Math.abs(landmarks[11].y - landmarks[12].y) / torsoHeight;
   const hipSkew = Math.abs(landmarks[23].y - landmarks[24].y) / torsoHeight;
-  const facingCamera = shoulderWidth >= 0.3 && hipWidth >= 0.15 && shoulderSkew <= 0.45 && hipSkew <= 0.45;
+  const shoulderDepthSkew = Math.abs((landmarks[11].z ?? 0) - (landmarks[12].z ?? 0)) / torsoHeight;
+  const hipDepthSkew = Math.abs((landmarks[23].z ?? 0) - (landmarks[24].z ?? 0)) / torsoHeight;
+  const facingCamera = shoulderWidth >= 0.3 && hipWidth >= 0.15
+    && shoulderSkew <= 0.45 && hipSkew <= 0.45
+    && shoulderDepthSkew <= 0.55 && hipDepthSkew <= 0.55;
 
   const extendedArm = (shoulder, elbow, wrist) => {
     if (!visible(landmarks, [shoulder, elbow, wrist])) return false;
@@ -65,12 +69,9 @@ export function classifyPose(landmarks) {
       && distance3d(points[0], points[2]) / torsoHeight >= 0.78;
   };
 
-  const extendedLeg = (hip, knee, ankle) => {
-    if (!visible(landmarks, [hip, knee, ankle])) return false;
-    const points = [landmarks[hip], landmarks[knee], landmarks[ankle]];
-    return (points[2].z ?? 0) < (points[0].z ?? 0) - torsoHeight * 0.3
-      && angleAt(points[0], points[1], points[2]) >= 135
-      && distance3d(points[1], points[2]) / torsoHeight >= 0.55;
+  const kneeAboveWaist = (hip, knee) => {
+    return visible(landmarks, [hip, knee], 0.35)
+      && landmarks[knee].y < landmarks[hip].y;
   };
 
   return {
@@ -78,16 +79,16 @@ export function classifyPose(landmarks) {
     facingCamera,
     leftPunch: facingCamera && extendedArm(11, 13, 15),
     rightPunch: facingCamera && extendedArm(12, 14, 16),
-    leftKick: facingCamera && extendedLeg(23, 25, 27),
-    rightKick: facingCamera && extendedLeg(24, 26, 28),
+    leftKick: facingCamera && kneeAboveWaist(23, 25),
+    rightKick: facingCamera && kneeAboveWaist(24, 26),
   };
 }
 
-export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650, releaseFrames = 4 } = {}) {
+export function createGestureGate({ confirmationFrames = 4, cooldownMs = 800, releaseFrames = 8 } = {}) {
   const frames = Object.fromEntries(ACTIONS.map((action) => [action, 0]));
   const latched = Object.fromEntries(ACTIONS.map((action) => [action, false]));
   const inactiveFrames = Object.fromEntries(ACTIONS.map((action) => [action, 0]));
-  const lastAcceptedAt = Object.fromEntries(ACTIONS.map((action) => [action, -Infinity]));
+  let lastAcceptedAt = -Infinity;
 
   return {
     resetForTrackingLoss() {
@@ -112,9 +113,9 @@ export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650, re
       }
       inactiveFrames[kind] = 0;
       frames[kind] += 1;
-      if (frames[kind] < confirmationFrames || latched[kind] || now - lastAcceptedAt[kind] < cooldownMs) return false;
+      if (frames[kind] < confirmationFrames || latched[kind] || now - lastAcceptedAt < cooldownMs) return false;
       latched[kind] = true;
-      lastAcceptedAt[kind] = now;
+      lastAcceptedAt = now;
       return true;
     },
   };

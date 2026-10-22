@@ -16,7 +16,7 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   let animationFrame = 0;
   let running = false;
   let lastVideoTime = -1;
-  const gestureGate = createGestureGate();
+  const gestureGate = createGestureGate({ confirmationFrames: 4, cooldownMs: 800, releaseFrames: 8 });
   let lastActionTimer = 0;
   let lastInferenceAt = 0;
 
