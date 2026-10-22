@@ -46,7 +46,7 @@ export function classifyPose(landmarks) {
   const hipWidth = distance(landmarks[23], landmarks[24]) / torsoHeight;
   const shoulderSkew = Math.abs(landmarks[11].y - landmarks[12].y) / torsoHeight;
   const hipSkew = Math.abs(landmarks[23].y - landmarks[24].y) / torsoHeight;
-  const facingCamera = shoulderWidth >= 0.5 && hipWidth >= 0.28 && shoulderSkew <= 0.35 && hipSkew <= 0.35;
+  const facingCamera = shoulderWidth >= 0.3 && hipWidth >= 0.15 && shoulderSkew <= 0.45 && hipSkew <= 0.45;
   const extendedArm = (shoulder, elbow, wrist) => {
     if (!visible(landmarks, [shoulder, elbow, wrist])) return false;
     const points = [landmarks[shoulder], landmarks[elbow], landmarks[wrist]];
@@ -69,9 +69,10 @@ export function classifyPose(landmarks) {
     kick: facingCamera && (extendedLeg(23, 25, 27) || extendedLeg(24, 26, 28)),
   };
 }
-export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650 } = {}) {
+export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650, releaseFrames = 4 } = {}) {
   const frames = { punch: 0, kick: 0 };
   const latched = { punch: false, kick: false };
+  const inactiveFrames = { punch: 0, kick: 0 };
   let lastAcceptedAt = -Infinity;
 
   return {
@@ -80,16 +81,26 @@ export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650 } =
       frames.kick = 0;
       latched.punch = true;
       latched.kick = true;
+      inactiveFrames.punch = 0;
+      inactiveFrames.kick = 0;
     },
     observe(kind, active, now) {
       if (!active) {
         frames[kind] = 0;
-        latched[kind] = false;
+        if (latched[kind]) {
+          inactiveFrames[kind] += 1;
+          if (inactiveFrames[kind] >= releaseFrames) {
+            latched[kind] = false;
+            inactiveFrames[kind] = 0;
+          }
+        }
         return false;
       }
+      inactiveFrames[kind] = 0;
       frames[kind] += 1;
       if (frames[kind] < confirmationFrames || latched[kind] || now - lastAcceptedAt < cooldownMs) return false;
       latched[kind] = true;
+      inactiveFrames[kind] = 0;
       lastAcceptedAt = now;
       return true;
     },

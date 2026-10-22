@@ -33,6 +33,15 @@ test('requires a front-facing pose before recognizing attacks', () => {
   assert.equal(result.kick, false);
 });
 
+test('accepts a front-facing pose with a narrow camera crop', () => {
+  const pose = standingPose();
+  Object.assign(pose[11], { x: 0.455 });
+  Object.assign(pose[12], { x: 0.545 });
+  Object.assign(pose[23], { x: 0.475 });
+  Object.assign(pose[24], { x: 0.525 });
+  assert.equal(classifyPose(pose).facingCamera, true);
+});
+
 test('recognizes a front-facing fist extended toward the camera', () => {
   const pose = standingPose();
   Object.assign(pose[13], { z: -0.05 });
@@ -63,6 +72,23 @@ test('requires repeated frames and suppresses a held gesture', () => {
   assert.equal(gate.observe('punch', true, 99), false);
 });
 
+test('does not retrigger when a held gesture flickers inactive briefly', () => {
+  const gate = createGestureGate({ confirmationFrames: 3, cooldownMs: 650, releaseFrames: 4 });
+  assert.equal(gate.observe('punch', true, 0), false);
+  assert.equal(gate.observe('punch', true, 33), false);
+  assert.equal(gate.observe('punch', true, 66), true);
+  gate.observe('punch', false, 99);
+  gate.observe('punch', true, 132);
+  assert.equal(gate.observe('punch', true, 165), false);
+  gate.observe('punch', false, 198);
+  gate.observe('punch', false, 231);
+  gate.observe('punch', false, 264);
+  gate.observe('punch', false, 297);
+  assert.equal(gate.observe('punch', true, 1000), false);
+  assert.equal(gate.observe('punch', true, 1033), false);
+  assert.equal(gate.observe('punch', true, 1066), true);
+});
+
 test('does not replay an extended gesture immediately after tracking returns', () => {
   const gate = createGestureGate({ confirmationFrames: 3, cooldownMs: 650 });
   gate.resetForTrackingLoss();
@@ -70,6 +96,9 @@ test('does not replay an extended gesture immediately after tracking returns', (
   assert.equal(gate.observe('kick', true, 1033), false);
   assert.equal(gate.observe('kick', true, 1066), false);
   gate.observe('kick', false, 1099);
+  gate.observe('kick', false, 1100);
+  gate.observe('kick', false, 1101);
+  gate.observe('kick', false, 1102);
   assert.equal(gate.observe('kick', true, 1132), false);
   assert.equal(gate.observe('kick', true, 1165), false);
   assert.equal(gate.observe('kick', true, 1198), true);
