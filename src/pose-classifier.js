@@ -18,56 +18,57 @@ function midpoint(first, second) {
 }
 
 function angleAt(first, vertex, last) {
-  const firstVector = { x: first.x - vertex.x, y: first.y - vertex.y };
-  const lastVector = { x: last.x - vertex.x, y: last.y - vertex.y };
-  const magnitude = Math.hypot(firstVector.x, firstVector.y) * Math.hypot(lastVector.x, lastVector.y);
+  const firstVector = { x: first.x - vertex.x, y: first.y - vertex.y, z: (first.z ?? 0) - (vertex.z ?? 0) };
+  const lastVector = { x: last.x - vertex.x, y: last.y - vertex.y, z: (last.z ?? 0) - (vertex.z ?? 0) };
+  const magnitude = Math.hypot(firstVector.x, firstVector.y, firstVector.z) * Math.hypot(lastVector.x, lastVector.y, lastVector.z);
   if (magnitude === 0) return 0;
-  const cosine = (firstVector.x * lastVector.x + firstVector.y * lastVector.y) / magnitude;
+  const cosine = (firstVector.x * lastVector.x + firstVector.y * lastVector.y + firstVector.z * lastVector.z) / magnitude;
   return Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI;
 }
 
-export function classifyPose(landmarks, referenceX = null) {
+function distance3d(first, second) {
+  return Math.hypot(first.x - second.x, first.y - second.y, (first.z ?? 0) - (second.z ?? 0));
+}
+
+export function classifyPose(landmarks) {
   if (!landmarks || !visible(landmarks, REQUIRED_LANDMARKS)) {
-    return { tracked: false, direction: 0, punch: false, kick: false, centerX: null };
+    return { tracked: false, facingCamera: false, punch: false, kick: false };
   }
 
   const shoulderCenter = midpoint(landmarks[11], landmarks[12]);
   const hipCenter = midpoint(landmarks[23], landmarks[24]);
   const torsoHeight = distance(shoulderCenter, hipCenter);
   if (torsoHeight < 0.12) {
-    return { tracked: false, direction: 0, punch: false, kick: false, centerX: null };
+    return { tracked: false, facingCamera: false, punch: false, kick: false };
   }
 
-  const centerX = (shoulderCenter.x + hipCenter.x) / 2;
-  const movementDelta = referenceX === null ? 0 : centerX - referenceX;
-  const direction = movementDelta < -0.11 ? 1 : movementDelta > 0.11 ? -1 : 0;
+  const shoulderWidth = distance(landmarks[11], landmarks[12]) / torsoHeight;
+  const hipWidth = distance(landmarks[23], landmarks[24]) / torsoHeight;
+  const shoulderSkew = Math.abs(landmarks[11].y - landmarks[12].y) / torsoHeight;
+  const hipSkew = Math.abs(landmarks[23].y - landmarks[24].y) / torsoHeight;
+  const facingCamera = shoulderWidth >= 0.5 && hipWidth >= 0.28 && shoulderSkew <= 0.35 && hipSkew <= 0.35;
   const extendedArm = (shoulder, elbow, wrist) => {
     if (!visible(landmarks, [shoulder, elbow, wrist])) return false;
     const points = [landmarks[shoulder], landmarks[elbow], landmarks[wrist]];
-    const wristHeightValid = points[2].y > shoulderCenter.y - torsoHeight * 0.55
-      && points[2].y < hipCenter.y + torsoHeight * 0.2;
-    return wristHeightValid
-      && angleAt(points[0], points[1], points[2]) >= 148
-      && distance(points[0], points[2]) / torsoHeight >= 0.82;
+    return (points[2].z ?? 0) < (points[0].z ?? 0) - torsoHeight * 0.28
+      && angleAt(points[0], points[1], points[2]) >= 135
+      && distance3d(points[0], points[2]) / torsoHeight >= 0.78;
   };
   const extendedLeg = (hip, knee, ankle) => {
     if (!visible(landmarks, [hip, knee, ankle])) return false;
     const points = [landmarks[hip], landmarks[knee], landmarks[ankle]];
-    return angleAt(points[0], points[1], points[2]) >= 145
-      && distance(points[1], points[2]) / torsoHeight >= 0.55
-      && Math.abs(points[2].x - points[0].x) / torsoHeight >= 0.58
-      && points[2].y < points[0].y + torsoHeight * 1.25;
+    return (points[2].z ?? 0) < (points[0].z ?? 0) - torsoHeight * 0.3
+      && angleAt(points[0], points[1], points[2]) >= 135
+      && distance3d(points[1], points[2]) / torsoHeight >= 0.55;
   };
 
   return {
     tracked: true,
-    direction,
-    punch: extendedArm(11, 13, 15) || extendedArm(12, 14, 16),
-    kick: extendedLeg(23, 25, 27) || extendedLeg(24, 26, 28),
-    centerX,
+    facingCamera,
+    punch: facingCamera && (extendedArm(11, 13, 15) || extendedArm(12, 14, 16)),
+    kick: facingCamera && (extendedLeg(23, 25, 27) || extendedLeg(24, 26, 28)),
   };
 }
-
 export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650 } = {}) {
   const frames = { punch: 0, kick: 0 };
   const latched = { punch: false, kick: false };
@@ -91,38 +92,6 @@ export function createGestureGate({ confirmationFrames = 3, cooldownMs = 650 } =
       latched[kind] = true;
       lastAcceptedAt = now;
       return true;
-    },
-  };
-}
-
-export function createDirectionFilter({ confirmationFrames = 3 } = {}) {
-  let direction = 0;
-  let candidate = 0;
-  let candidateFrames = 0;
-
-  return {
-    reset() {
-      direction = 0;
-      candidate = 0;
-      candidateFrames = 0;
-      return direction;
-    },
-    observe(nextDirection) {
-      if (nextDirection === direction) {
-        candidate = direction;
-        candidateFrames = 0;
-        return direction;
-      }
-      if (nextDirection === candidate) candidateFrames += 1;
-      else {
-        candidate = nextDirection;
-        candidateFrames = 1;
-      }
-      if (candidateFrames >= confirmationFrames) {
-        direction = candidate;
-        candidateFrames = 0;
-      }
-      return direction;
     },
   };
 }

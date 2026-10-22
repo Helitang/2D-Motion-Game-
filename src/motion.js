@@ -1,21 +1,16 @@
-import { classifyPose, createDirectionFilter, createGestureGate } from './pose-classifier.js';
+import { classifyPose, createGestureGate } from './pose-classifier.js';
 
 const TASKS_VERSION = '1.1.1';
 const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 const ATTACK_COOLDOWN_MS = 650;
 
-export function createMotionController({ video, overlay, cameraWindow, status, statusLight, actionState, actionLabel, toggleButton, recenterButton, onMove, onAttack }) {
+export function createMotionController({ video, overlay, cameraWindow, status, statusLight, actionState, actionLabel, toggleButton, onAttack }) {
   let stream = null;
   let landmarker = null;
   let animationFrame = 0;
   let running = false;
   let lastVideoTime = -1;
-  let referenceX = null;
-  let calibrationSamples = [];
-  let calibrating = false;
-  let currentDirection = 0;
-  const directionFilter = createDirectionFilter();
   const gestureGate = createGestureGate();
   let lastActionTimer = 0;
   let lastInferenceAt = 0;
@@ -23,12 +18,6 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   const setStatus = (message, state = '') => {
     status.textContent = message;
     statusLight.dataset.state = state;
-  };
-
-  const setMove = (direction) => {
-    if (direction === currentDirection) return;
-    currentDirection = direction;
-    onMove(direction);
   };
 
   const setAction = (message) => {
@@ -74,8 +63,6 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   };
 
   const loseTracking = () => {
-    directionFilter.reset();
-    setMove(0);
     gestureGate.resetForTrackingLoss();
     const context = overlay.getContext('2d');
     context.clearRect(0, 0, overlay.width, overlay.height);
@@ -97,32 +84,19 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
       return;
     }
     drawPose(landmarks);
-    const pose = classifyPose(landmarks, referenceX);
+    const pose = classifyPose(landmarks);
     if (!pose.tracked) {
       loseTracking();
       return;
     }
-    if (referenceX === null || calibrating) {
-      calibrationSamples.push(pose.centerX);
-      directionFilter.reset();
-      setMove(0);
-      if (calibrationSamples.length >= 24) {
-        calibrationSamples.sort((first, second) => first - second);
-        referenceX = calibrationSamples[Math.floor(calibrationSamples.length / 2)];
-        calibrationSamples = [];
-        calibrating = false;
-        setStatus('人體追蹤中');
-      } else {
-        setStatus('請站在畫面中央校正站姿');
-      }
+    if (!pose.facingCamera) {
+      gestureGate.resetForTrackingLoss();
+      setStatus('請正面面向鏡頭');
+      actionState.textContent = 'READY';
+      actionLabel.textContent = '面向鏡頭出拳或踢腳';
       return;
     }
-    setStatus('人體追蹤中', 'ready');
-    setMove(directionFilter.observe(pose.direction));
-    if (now >= lastActionTimer) {
-      actionState.textContent = pose.punch || pose.kick ? '姿勢' : 'READY';
-      actionLabel.textContent = pose.punch ? '伸臂姿勢' : pose.kick ? '抬腿姿勢' : '等待動作';
-    }
+    setStatus('正面追蹤中', 'ready');
     const attack = pose.punch ? 'punch' : pose.kick ? 'kick' : null;
     acceptGesture(attack === 'punch', 'punch', now);
     acceptGesture(attack === 'kick', 'kick', now);
@@ -131,7 +105,6 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   const stop = () => {
     running = false;
     window.cancelAnimationFrame(animationFrame);
-    setMove(0);
     stream?.getTracks().forEach((track) => track.stop());
     stream = null;
     landmarker?.close();
@@ -139,7 +112,6 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
     video.srcObject = null;
     cameraWindow.dataset.active = 'false';
     document.querySelector('#camera-live').hidden = true;
-    recenterButton.disabled = true;
     toggleButton.disabled = false;
     toggleButton.textContent = '啟動動作控制';
     setStatus('相機已停止');
@@ -183,15 +155,11 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
         });
       }
       running = true;
-      referenceX = null;
-      calibrating = true;
-      calibrationSamples = [];
       cameraWindow.dataset.active = 'true';
       document.querySelector('#camera-live').hidden = false;
-      recenterButton.disabled = false;
       toggleButton.disabled = false;
       toggleButton.textContent = '停止動作控制';
-      setStatus('請站在畫面中央校正站姿');
+      setStatus('請正面面向鏡頭');
       animationFrame = window.requestAnimationFrame(detectFrame);
     } catch (error) {
       stop();
@@ -207,16 +175,6 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   };
 
   const toggle = () => running ? stop() : start();
-  const recenter = () => {
-    if (!running) return;
-    referenceX = null;
-    calibrationSamples = [];
-    calibrating = true;
-    setMove(0);
-    setStatus('請站在畫面中央校正站姿');
-  };
-
   toggleButton.addEventListener('click', toggle);
-  recenterButton.addEventListener('click', recenter);
   return { stop };
 }

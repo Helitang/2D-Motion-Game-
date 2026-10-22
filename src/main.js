@@ -6,15 +6,13 @@ const WORLD_WIDTH = 2400;
 const FLOOR_Y = 430;
 const PLAYER_MAX_HP = 100;
 const ENEMY_MAX_HP = 100;
-const COMBO_WINDOW = 1400;
-const keyboardDirections = new Set();
-let keyboardMove = 0;
+const PLAYER_SCREEN_X = 384;
+const BATTLE_WORLD_X = 700;
+const INTRO_SPEED = 280;
 
 const ATTACKS = {
   punch: { damage: 10, range: 72, startup: 90, active: 110, recovery: 250, label: '拳擊' },
   kick: { damage: 15, range: 104, startup: 150, active: 130, recovery: 330, label: '踢擊' },
-  heavy: { damage: 25, range: 118, startup: 270, active: 160, recovery: 500, label: '重攻擊' },
-  combo: { damage: 23, range: 112, startup: 130, active: 160, recovery: 390, label: '連續技' },
 };
 
 const ui = {
@@ -62,8 +60,6 @@ function makeFighter(scene, x, palette, isPlayer) {
 class ArenaScene extends Phaser.Scene {
   constructor() {
     super('arena');
-    this.touchMove = 0;
-    this.comboInputs = [];
     this.enemyState = 'approach';
     this.enemyTimer = 0;
     this.enemyAttackElapsed = 0;
@@ -74,38 +70,35 @@ class ArenaScene extends Phaser.Scene {
   }
 
   create() {
-    this.touchMove = 0;
-    this.comboInputs = [];
     this.enemyState = 'approach';
     this.enemyTimer = 0;
     this.enemyAttackElapsed = 0;
     this.enemyHasHit = false;
     this.paused = false;
     this.ended = false;
+    this.battleStarted = false;
     this.messageTime = 0;
     ui.message.textContent = '— 尋找破綻 —';
     ui.pause.textContent = 'Ⅱ';
     ui.pause.setAttribute('aria-label', '暫停');
     this.drawWorld();
-    this.player = makeFighter(this, 190, {
+    this.player = makeFighter(this, PLAYER_SCREEN_X, {
       cloak: 0x395a54, legs: 0x273b37, boots: 0x1e302d,
       torso: 0x718b76, trim: 0xe2b96e, head: 0xd6ad83, hair: 0x263731,
     }, true);
-    this.enemy = makeFighter(this, 720, {
+    this.enemy = makeFighter(this, 1030, {
       cloak: 0x693d37, legs: 0x463b35, boots: 0x302e29,
       torso: 0x9a5948, trim: 0xd9a866, head: 0xb68261, hair: 0x49332f,
     }, false);
 
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, 540);
-    this.cameras.main.startFollow(this.player.figure, true, 0.12, 0);
-    this.cameras.main.setDeadzone(190, 20);
+    this.cameras.main.stopFollow();
+    this.cameras.main.setScroll(0, 0);
     this.updateHud();
     window.addEventListener('arena-attack', this.onAttackEvent);
-    window.addEventListener('arena-move', this.onMoveEvent);
     window.addEventListener('arena-pause', this.onPauseEvent);
     this.events.once('shutdown', () => {
       window.removeEventListener('arena-attack', this.onAttackEvent);
-      window.removeEventListener('arena-move', this.onMoveEvent);
       window.removeEventListener('arena-pause', this.onPauseEvent);
     });
   }
@@ -148,56 +141,35 @@ class ArenaScene extends Phaser.Scene {
   }
 
   onAttackEvent = (event) => this.startAttack(event.detail);
-  onMoveEvent = (event) => { this.touchMove = event.detail; };
   onPauseEvent = () => this.togglePause();
 
   startAttack(type) {
     if (this.paused || this.ended || this.player.attack) return;
-    const now = this.time.now;
-    this.comboInputs = this.comboInputs.filter((entry) => now - entry.time <= COMBO_WINDOW);
-    this.comboInputs.push({ type, time: now });
-    const isCombo = this.comboInputs.slice(-3).map((entry) => entry.type).join(',') === 'punch,punch,kick';
-    if (isCombo) {
-      type = 'combo';
-      this.comboInputs = [];
-      this.showMessage('連續技！', 1100);
-    }
     const spec = ATTACKS[type];
+    if (!spec) return;
     this.player.attack = { type, spec, elapsed: 0, hit: false };
     this.player.state = 'attack';
     if (type === 'kick') {
       this.player.frontLeg.angle = -52;
       this.tweens.add({ targets: this.player.frontLeg, angle: 0, duration: 260, ease: 'Quad.Out' });
     } else {
-      this.player.arm.rotation = type === 'heavy' ? -1.05 : -0.62;
-      this.player.fist.x = type === 'heavy' || type === 'combo' ? 68 : 62;
+      this.player.arm.rotation = -0.62;
+      this.player.fist.x = 62;
       this.tweens.add({
         targets: this.player.arm,
         rotation: 0,
-        duration: type === 'heavy' ? 430 : 220,
+        duration: 220,
         ease: 'Quad.Out',
       });
       this.tweens.add({
         targets: this.player.fist,
         x: 54,
-        delay: type === 'heavy' ? 130 : 40,
-        duration: type === 'heavy' ? 320 : 180,
+        delay: 40,
+        duration: 180,
         ease: 'Quad.Out',
       });
     }
     this.showMessage(spec.label, 650);
-  }
-
-  movePlayer(direction, delta) {
-    const speed = 270;
-    this.player.figure.x = Phaser.Math.Clamp(this.player.figure.x + direction * speed * delta / 1000, 24, WORLD_WIDTH - 24);
-    if (direction) {
-      this.player.facing = direction;
-      this.player.figure.setScale(direction, 1);
-      if (!this.player.attack) this.player.state = 'move';
-    } else if (!this.player.attack && this.player.state !== 'hurt' && this.player.hp > 0) {
-      this.player.state = 'idle';
-    }
   }
 
   updatePlayerAttack(delta) {
@@ -208,7 +180,7 @@ class ArenaScene extends Phaser.Scene {
     const activeEnd = activeStart + attack.spec.active;
     if (!attack.hit && attack.elapsed >= activeStart && attack.elapsed < activeEnd) {
       const distance = this.enemy.figure.x - this.player.figure.x;
-      const facingTarget = Math.sign(distance) === this.player.facing;
+      const facingTarget = distance > 0;
       if (this.enemy.hp > 0 && facingTarget && Math.abs(distance) <= attack.spec.range + 26) {
         attack.hit = true;
         this.damageEnemy(attack.spec.damage);
@@ -314,7 +286,7 @@ class ArenaScene extends Phaser.Scene {
     ui.enemyHealth.style.width = `${this.enemy.hp / this.enemy.maxHp * 100}%`;
     ui.playerHpLabel.textContent = `${this.player.hp} / ${this.player.maxHp}`;
     ui.enemyHpLabel.textContent = `${this.enemy.hp} / ${this.enemy.maxHp}`;
-    ui.state.textContent = this.paused ? '暫停中' : this.enemy.hp === 0 ? '勝利' : this.player.hp === 0 ? '戰敗' : '迎戰中';
+    ui.state.textContent = this.paused ? '暫停中' : this.enemy.hp === 0 ? '勝利' : this.player.hp === 0 ? '戰敗' : this.battleStarted ? '迎戰中' : '入場中';
   }
 
   togglePause() {
@@ -335,7 +307,18 @@ class ArenaScene extends Phaser.Scene {
 
   update(_time, delta) {
     if (this.paused || this.ended) return;
-    this.movePlayer(Phaser.Math.Clamp(keyboardMove || this.touchMove, -1, 1), delta);
+    if (!this.battleStarted) {
+      this.player.figure.setScale(1, 1);
+      this.player.figure.x = Math.min(BATTLE_WORLD_X, this.player.figure.x + INTRO_SPEED * delta / 1000);
+      this.cameras.main.setScroll(Math.max(0, this.player.figure.x - PLAYER_SCREEN_X), 0);
+      if (this.player.figure.x >= BATTLE_WORLD_X) {
+        this.battleStarted = true;
+        this.showMessage('已進入戰鬥位置', 1200);
+        this.updateHud();
+      }
+      return;
+    }
+    this.player.figure.setScale(1, 1);
     this.updatePlayerAttack(delta);
     this.updateEnemy(delta);
     if (this.player.invulnerable > 0) this.player.invulnerable -= delta;
@@ -360,33 +343,13 @@ const game = new Phaser.Game({
 const arena = () => game.scene.getScene('arena');
 document.querySelector('#pause-toggle').addEventListener('click', () => arena()?.togglePause());
 document.querySelector('#restart').addEventListener('click', () => arena()?.resetArena());
-document.querySelectorAll('[data-move]').forEach((button) => {
-  const stop = () => window.dispatchEvent(new CustomEvent('arena-move', { detail: 0 }));
-  button.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    window.dispatchEvent(new CustomEvent('arena-move', { detail: Number(button.dataset.move) }));
-  });
-  button.addEventListener('pointerup', stop);
-  button.addEventListener('pointerleave', stop);
-  button.addEventListener('pointercancel', stop);
-});
 document.querySelectorAll('[data-attack]').forEach((button) => {
   button.addEventListener('click', () => window.dispatchEvent(new CustomEvent('arena-attack', { detail: button.dataset.attack })));
 });
-const movementKeys = { a: -1, arrowleft: -1, d: 1, arrowright: 1 };
-const attackKeys = { j: 'punch', k: 'kick', l: 'heavy' };
-const refreshKeyboardMove = () => {
-  keyboardMove = [...keyboardDirections].reduce((direction, key) => direction + movementKeys[key], 0);
-};
+const attackKeys = { j: 'punch', k: 'kick' };
 
 window.addEventListener('keydown', (event) => {
   const key = event.key.toLowerCase();
-  if (key in movementKeys) {
-    event.preventDefault();
-    keyboardDirections.add(key);
-    refreshKeyboardMove();
-    return;
-  }
   if (event.repeat) return;
   if (key in attackKeys) {
     event.preventDefault();
@@ -397,14 +360,6 @@ window.addEventListener('keydown', (event) => {
   }
 }, { passive: false });
 
-window.addEventListener('keyup', (event) => {
-  const key = event.key.toLowerCase();
-  if (key in movementKeys) {
-    keyboardDirections.delete(key);
-    refreshKeyboardMove();
-  }
-});
-
 const motionController = createMotionController({
   video: document.querySelector('#motion-video'),
   overlay: document.querySelector('#pose-overlay'),
@@ -414,8 +369,6 @@ const motionController = createMotionController({
   actionState: document.querySelector('#motion-action-state'),
   actionLabel: document.querySelector('#motion-action-label'),
   toggleButton: document.querySelector('#camera-toggle'),
-  recenterButton: document.querySelector('#recenter-camera'),
-  onMove: (direction) => window.dispatchEvent(new CustomEvent('arena-move', { detail: direction })),
   onAttack: (kind) => window.dispatchEvent(new CustomEvent('arena-attack', { detail: kind })),
 });
 

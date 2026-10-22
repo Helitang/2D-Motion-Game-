@@ -33,6 +33,7 @@
       "cooldown_ms": null
     },
     "heavy": {
+      "enabled": false,
       "damage": 25,
       "range": null,
       "startup_ms": null,
@@ -41,6 +42,7 @@
       "cooldown_ms": null
     },
     "combo": {
+      "enabled": false,
       "sequence": [
         "punch",
         "punch",
@@ -70,22 +72,11 @@
     "primary": "camera_motion_recognition",
     "keyboard_fallback_enabled": true,
     "keyboard": {
-      "move_left": [
-        "A",
-        "ArrowLeft"
-      ],
-      "move_right": [
-        "D",
-        "ArrowRight"
-      ],
       "punch": [
         "J"
       ],
       "kick": [
         "K"
-      ],
-      "heavy": [
-        "L"
       ],
       "pause": [
         "Escape"
@@ -94,14 +85,16 @@
   },
   "motion_recognition": {
     "required_actions": [
-      "move_left",
-      "move_right",
       "punch",
       "kick"
     ],
-    "optional_actions": [
-      "heavy"
-    ],
+    "optional_actions": [],
+    "facing": "camera",
+    "capture_resolution": {
+      "width": 320,
+      "height": 240
+    },
+    "preview": "black_skeleton_only",
     "confidence_threshold": null,
     "duplicate_suppression_enabled": true,
     "cooldown_seconds": 0.5,
