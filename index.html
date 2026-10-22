@@ -1,51 +1,110 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全身動作辨識 - 前鏡頭測試</title>
-    <style>
-        body {
-            margin: 0;
-            background-color: #111;
-            color: #fff;
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        #video-container {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            aspect-ratio: 3/4;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1); /* 鏡像翻轉，比較符合直覺 */
-        }
-        #status {
-            margin-top: 15px;
-            font-size: 16px;
-            color: #aaa;
-        }
-    </style>
-</head>
-<body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#d8e1da" />
+        <meta name="description" content="Ashen Vow：2D 橫向動作 RPG 原型。" />
+        <title>Ashen Vow | Motion Realm</title>
+    </head>
+    <body>
+        <div class="orientation-gate" role="status">
+            <span class="rotate-symbol" aria-hidden="true">↻</span>
+            <p>請將裝置轉為橫向</p>
+        </div>
+        <main class="shell">
+            <header class="masthead">
+                <a class="brand" href="#top" aria-label="Ashen Vow 首頁">
+                    <span class="brand-mark" aria-hidden="true">A</span>
+                    <span><strong>ASHEN VOW</strong><small>MOTION REALM · FIELD 01</small></span>
+                </a>
+                <div class="build-tag"><span class="live-dot"></span> PROTOTYPE 01</div>
+            </header>
 
-    <div id="video-container">
-        <video id="webcam" autoplay playsinline muted></video>
-    </div>
-    <div id="status">正在請求相機權限...</div>
+            <div class="play-grid">
+            <section class="battle" id="top" aria-label="遊戲戰場">
+                <div class="arena-heading">
+                    <div><p class="eyebrow">THE OLD ROAD</p><h1>暮色邊境</h1></div>
+                    <div class="arena-meta"><span>STAGE 01</span><span class="meta-divider"></span><span>WAVE 01</span></div>
+                </div>
 
-    <script src="app.js"></script>
-</body>
+                <div class="game-frame">
+                    <div class="game-hud">
+                        <div class="fighter-hud player-hud">
+                            <div class="hud-label"><span>旅人</span><span id="player-hp-label">100 / 100</span></div>
+                            <div class="health-track"><span id="player-health"></span></div>
+                            <small>VANGUARD</small>
+                        </div>
+                        <div class="fight-state" id="fight-state" aria-live="polite">迎戰中</div>
+                        <div class="fighter-hud enemy-hud">
+                            <div class="hud-label"><span>荒原掠奪者</span><span id="enemy-hp-label">100 / 100</span></div>
+                            <div class="health-track"><span id="enemy-health"></span></div>
+                            <small>RAIDER · LV 01</small>
+                        </div>
+                    </div>
+                    <div id="game-container" aria-label="Phaser 遊戲畫面"></div>
+                    <div class="stage-caption"><span>ASHFALL FRONTIER</span><span id="stage-message">— 尋找破綻 —</span></div>
+                    <div class="stage-actions">
+                        <button class="icon-button" id="pause-toggle" type="button" aria-label="暫停" title="暫停 / 繼續">Ⅱ</button>
+                        <button class="icon-button" id="restart" type="button" aria-label="重新開始" title="重新開始">↻</button>
+                    </div>
+                </div>
+
+                <div class="control-strip" aria-label="鍵盤操作">
+                    <div class="control-group movement-group">
+                        <span class="control-title">移動</span>
+                        <span class="keycap">A</span><span class="keycap">D</span>
+                        <span class="key-or">或</span>
+                        <span class="keycap key-wide">←</span><span class="keycap key-wide">→</span>
+                    </div>
+                    <span class="control-divider"></span>
+                    <div class="control-group"><span class="keycap attack-key">J</span><span>拳擊</span></div>
+                    <div class="control-group"><span class="keycap attack-key">K</span><span>踢擊</span></div>
+                    <div class="control-group"><span class="keycap attack-key">L</span><span>重攻擊</span></div>
+                    <span class="combo-note"><span class="combo-mark">✦</span> J · J · K <small>連續技</small></span>
+                </div>
+
+                <div class="touch-controls" aria-label="觸控操作">
+                    <div class="touch-movement">
+                        <button type="button" data-move="-1" aria-label="向左移動">←</button>
+                        <button type="button" data-move="1" aria-label="向右移動">→</button>
+                    </div>
+                    <div class="touch-attacks">
+                        <button type="button" data-attack="punch"><span>J</span>拳</button>
+                        <button type="button" data-attack="kick"><span>K</span>踢</button>
+                        <button type="button" data-attack="heavy"><span>L</span>重擊</button>
+                    </div>
+                </div>
+            </section>
+            <aside class="motion-panel" aria-labelledby="motion-heading">
+                <div class="motion-panel-heading">
+                    <p class="eyebrow">FULL-BODY INPUT</p>
+                    <h2 id="motion-heading">動作控制</h2>
+                </div>
+                <div class="camera-window" id="camera-window">
+                    <video id="motion-video" autoplay playsinline muted></video>
+                    <canvas id="pose-overlay" aria-hidden="true"></canvas>
+                    <div class="camera-placeholder" id="camera-placeholder">
+                        <span class="camera-glyph" aria-hidden="true">◎</span>
+                        <span>相機尚未啟動</span>
+                    </div>
+                    <span class="camera-live" id="camera-live" hidden>LIVE · LOCAL</span>
+                </div>
+                <div class="motion-status-row">
+                    <span class="status-light" id="motion-status-light"></span>
+                    <span id="motion-status" role="status" aria-live="polite">等待相機啟動</span>
+                </div>
+                <div class="motion-action-readout">
+                    <span class="action-state" id="motion-action-state">READY</span>
+                    <span id="motion-action-label">尚無動作</span>
+                </div>
+                <button class="camera-toggle" id="camera-toggle" type="button">啟動動作控制</button>
+                <button class="recenter-button" id="recenter-camera" type="button" disabled>重新校正站姿</button>
+                <p class="privacy-note">姿態在此裝置即時辨識；影像不會上傳或儲存。</p>
+            </aside>
+            </div>
+            <footer class="footer-line"><span>ASHEN VOW <i>·</i> EARLY COMBAT PROTOTYPE</span><span>V 0.1.0</span></footer>
+        </main>
+        <script type="module" src="/src/main.js"></script>
+    </body>
 </html>

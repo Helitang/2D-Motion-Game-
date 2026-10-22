@@ -1,0 +1,19 @@
+{
+  "name": "ashen-vow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.1",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  }
+}

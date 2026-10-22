@@ -1,0 +1,121 @@
+{
+  "version": "1.8",
+  "status": "provisional",
+  "game": {
+    "type": "2d_side_scrolling_action_rpg",
+    "single_player": true,
+    "jump_enabled": false,
+    "target_fps": 30,
+    "target_input_response_ms": 200
+  },
+  "player": {
+    "max_hp": 100,
+    "defense": 5,
+    "damage_invulnerability_seconds": 0.5,
+    "movement_speed": null,
+    "acceleration": null
+  },
+  "attacks": {
+    "punch": {
+      "damage": 10,
+      "range": null,
+      "startup_ms": null,
+      "active_ms": null,
+      "recovery_ms": null,
+      "cooldown_ms": null
+    },
+    "kick": {
+      "damage": 15,
+      "range": null,
+      "startup_ms": null,
+      "active_ms": null,
+      "recovery_ms": null,
+      "cooldown_ms": null
+    },
+    "heavy": {
+      "damage": 25,
+      "range": null,
+      "startup_ms": null,
+      "active_ms": null,
+      "recovery_ms": null,
+      "cooldown_ms": null
+    },
+    "combo": {
+      "sequence": [
+        "punch",
+        "punch",
+        "kick"
+      ],
+      "input_window_ms": null
+    }
+  },
+  "enemies": {
+    "max_simultaneous_attackers": 1,
+    "regular": {
+      "max_hp": 100,
+      "attack_damage": 10,
+      "movement_speed": null,
+      "attack_range": null,
+      "attack_startup_ms": null,
+      "attack_recovery_ms": null
+    },
+    "boss": {
+      "max_hp": 500,
+      "attack_damage": null,
+      "movement_speed": null,
+      "attack_range": null
+    }
+  },
+  "input": {
+    "primary": "camera_motion_recognition",
+    "keyboard_fallback_enabled": true,
+    "keyboard": {
+      "move_left": [
+        "A",
+        "ArrowLeft"
+      ],
+      "move_right": [
+        "D",
+        "ArrowRight"
+      ],
+      "punch": [
+        "J"
+      ],
+      "kick": [
+        "K"
+      ],
+      "heavy": [
+        "L"
+      ],
+      "pause": [
+        "Escape"
+      ]
+    }
+  },
+  "motion_recognition": {
+    "required_actions": [
+      "move_left",
+      "move_right",
+      "punch",
+      "kick"
+    ],
+    "optional_actions": [
+      "heavy"
+    ],
+    "confidence_threshold": null,
+    "duplicate_suppression_enabled": true,
+    "cooldown_seconds": 0.5,
+    "frame_skip": 2,
+    "tracking_loss_timeout_ms": null
+  },
+  "testing": {
+    "stability_test_minutes": 30,
+    "recognition_precision_target": null,
+    "recognition_recall_target": null,
+    "false_trigger_target": null,
+    "latency_measurement_percentiles": [
+      50,
+      95
+    ]
+  }
+}
