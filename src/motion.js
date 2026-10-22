@@ -1,4 +1,4 @@
-import { classifyPose, createGestureGate } from './pose-classifier.js';
+import { classifyPose, createGestureGate, createPunchMotionDetector } from './pose-classifier.js';
 
 const TASKS_VERSION = '1.1.1';
 const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
@@ -17,6 +17,7 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   let running = false;
   let lastVideoTime = -1;
   const gestureGate = createGestureGate({ confirmationFrames: 4, cooldownMs: 800, releaseFrames: 8 });
+  const punchMotionDetector = createPunchMotionDetector({ windowMs: 220, minimumAdvance: 0.12 });
   let lastActionTimer = 0;
   let lastInferenceAt = 0;
 
@@ -69,6 +70,7 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
 
   const loseTracking = () => {
     gestureGate.resetForTrackingLoss();
+    punchMotionDetector.reset();
     const context = overlay.getContext('2d');
     context.clearRect(0, 0, overlay.width, overlay.height);
     setStatus('未偵測到完整人體，動作輸入已停止');
@@ -94,17 +96,23 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
       loseTracking();
       return;
     }
+    const leftPunchStarted = punchMotionDetector.observe(
+      'leftPunch', pose.leftPunchExtension, pose.facingCamera && pose.leftPunch, now,
+    );
+    const rightPunchStarted = punchMotionDetector.observe(
+      'rightPunch', pose.rightPunchExtension, pose.facingCamera && pose.rightPunch, now,
+    );
+    acceptGesture(leftPunchStarted, 'leftPunch', now);
+    acceptGesture(rightPunchStarted, 'rightPunch', now);
+    acceptGesture(pose.facingCamera && pose.leftKick, 'leftKick', now);
+    acceptGesture(pose.facingCamera && pose.rightKick, 'rightKick', now);
     if (!pose.facingCamera) {
-      gestureGate.resetForTrackingLoss();
       setStatus('請正面面向鏡頭');
       actionState.textContent = 'READY';
       actionLabel.textContent = '面向鏡頭出拳或前踢';
       return;
     }
     setStatus('正面追蹤中', 'ready');
-    for (const action of Object.keys(ACTION_LABELS)) {
-      acceptGesture(pose[action], action, now);
-    }
   };
 
   const stop = () => {

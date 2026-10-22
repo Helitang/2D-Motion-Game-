@@ -130,6 +130,8 @@
     "confirmation_frames": 4,
     "neutral_release_frames": 8,
     "cooldown_seconds": 0.8,
+    "punch_motion_window_ms": 220,
+    "punch_min_forward_advance_torso_ratio": 0.12,
     "front_kick_thresholds": {
       "landmark_visibility": 0.35,
       "rule": "same_side_knee_y_above_hip_y"

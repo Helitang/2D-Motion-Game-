@@ -40,6 +40,8 @@ function emptyPose(tracked = false) {
     rightPunch: false,
     leftKick: false,
     rightKick: false,
+    leftPunchExtension: 0,
+    rightPunchExtension: 0,
   };
 }
 
@@ -69,6 +71,11 @@ export function classifyPose(landmarks) {
       && distance3d(points[0], points[2]) / torsoHeight >= 0.78;
   };
 
+  const armExtension = (shoulder, wrist) => {
+    if (!visible(landmarks, [shoulder, wrist])) return 0;
+    return Math.max(0, ((landmarks[shoulder].z ?? 0) - (landmarks[wrist].z ?? 0)) / torsoHeight);
+  };
+
   const kneeAboveWaist = (hip, knee) => {
     return visible(landmarks, [hip, knee], 0.35)
       && landmarks[knee].y < landmarks[hip].y;
@@ -81,6 +88,28 @@ export function classifyPose(landmarks) {
     rightPunch: facingCamera && extendedArm(12, 14, 16),
     leftKick: facingCamera && kneeAboveWaist(23, 25),
     rightKick: facingCamera && kneeAboveWaist(24, 26),
+    leftPunchExtension: armExtension(11, 15),
+    rightPunchExtension: armExtension(12, 16),
+  };
+}
+
+export function createPunchMotionDetector({ windowMs = 220, minimumAdvance = 0.12 } = {}) {
+  const history = { leftPunch: [], rightPunch: [] };
+
+  return {
+    reset() {
+      history.leftPunch = [];
+      history.rightPunch = [];
+    },
+    observe(action, extension, poseActive, now) {
+      const samples = history[action];
+      const oldest = samples[0];
+      while (samples.length && now - samples[0].time > windowMs) samples.shift();
+      const baseline = samples[0]?.extension;
+      samples.push({ time: now, extension });
+      if (!poseActive || baseline === undefined) return false;
+      return extension - baseline >= minimumAdvance;
+    },
   };
 }
 

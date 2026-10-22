@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyPose, createGestureGate } from '../src/pose-classifier.js';
+import { classifyPose, createGestureGate, createPunchMotionDetector } from '../src/pose-classifier.js';
 
 function standingPose() {
   const points = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 1 }));
@@ -66,6 +66,19 @@ test('distinguishes left and right straight punches', () => {
   assert.equal(classifyPose(rightPose).rightPunch, true);
 });
 
+test('requires forward hand motion, not a static extended hand, for punches', () => {
+  const detector = createPunchMotionDetector({ windowMs: 220, minimumAdvance: 0.12 });
+  for (let time = 0; time <= 440; time += 55) {
+    assert.equal(detector.observe('leftPunch', 0.34, true, time), false);
+  }
+
+  detector.reset();
+  assert.equal(detector.observe('leftPunch', 0.02, false, 0), false);
+  assert.equal(detector.observe('leftPunch', 0.08, false, 80), false);
+  assert.equal(detector.observe('leftPunch', 0.19, false, 150), false);
+  assert.equal(detector.observe('leftPunch', 0.3, true, 180), true);
+});
+
 test('distinguishes left and right front kicks', () => {
   const leftPose = standingPose();
   Object.assign(leftPose[25], { y: 0.54 });
@@ -104,6 +117,8 @@ test('drops all actions when essential landmarks are low confidence', () => {
     rightPunch: false,
     leftKick: false,
     rightKick: false,
+    leftPunchExtension: 0,
+    rightPunchExtension: 0,
   });
 });
 

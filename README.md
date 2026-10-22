@@ -29,6 +29,7 @@ Touch buttons are available in landscape mode. Portrait screens show a rotate-de
 - Camera capture and pose inference run locally at 320×240.
 - The preview is black with pose landmarks only; raw camera video is hidden and is not uploaded or stored.
 - Face the camera and use a straight punch or front kick. Left/right actions have independent counters.
+- Punches require forward hand movement; a held or still hand does not count as a new punch.
 - Enemy AI and damage are paused while validating character actions.
 - Keyboard and touch controls can test all four actions independently.
 
