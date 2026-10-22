@@ -259,7 +259,7 @@
 
 ## Current Prototype Override
 
-For the current prototype, the V1.8 left/right movement and heavy-attack recognition requirements are deferred. The only camera actions are a punch and a kick while facing the camera. Side-facing poses are ignored. Camera input is captured at 320x240, and the preview displays a black background with pose landmarks only. The player remains fixed on the left half of the game view and always faces right; no body movement is used for locomotion.
+For the current prototype, the V1.8 left/right movement and heavy-attack recognition requirements are deferred. Camera actions are left straight punch, right straight punch, left front kick, and right front kick while facing the camera; side-facing poses are ignored. Each accepted action increments its own on-screen counter. Camera input is captured at 320x240, and the preview displays a black background with pose landmarks only. The player remains fixed on the left half of the game view and always faces right; no body movement is used for locomotion. Enemy AI and damage are disabled during action validation.
 
 
 

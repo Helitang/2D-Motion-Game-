@@ -15,8 +15,10 @@ Open the local URL printed by Vite. For a production build, run `npm run build`.
 
 | Action | Keyboard |
 | --- | --- |
-| Punch | J |
-| Kick | K |
+| Left straight punch | U |
+| Right straight punch | I |
+| Left front kick | J |
+| Right front kick | K |
 | Pause | Esc |
 
 Touch buttons are available in landscape mode. Portrait screens show a rotate-device prompt.
@@ -26,7 +28,8 @@ Touch buttons are available in landscape mode. Portrait screens show a rotate-de
 - The player enters automatically while the background scrolls left, then stays fixed in the left half of the screen and always faces right.
 - Camera capture and pose inference run locally at 320×240.
 - The preview is black with pose landmarks only; raw camera video is hidden and is not uploaded or stored.
-- Face the camera and punch or kick toward it. Side-facing poses are ignored.
-- Keyboard and touch punch/kick controls remain available as fallback controls.
+- Face the camera and use a straight punch or front kick. Left/right actions have independent counters.
+- Enemy AI and damage are paused while validating character actions.
+- Keyboard and touch controls can test all four actions independently.
 
 Pose thresholds are provisional. Recognition accuracy still needs validation with real users, lighting, and target devices; other game systems remain prototype scope for later work.

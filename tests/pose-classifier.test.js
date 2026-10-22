@@ -19,7 +19,7 @@ function standingPose() {
   return points;
 }
 
-test('requires a front-facing pose before recognizing attacks', () => {
+test('rejects attacks while the person is side-facing', () => {
   const pose = standingPose();
   Object.assign(pose[11], { x: 0.48 });
   Object.assign(pose[12], { x: 0.52 });
@@ -29,8 +29,7 @@ test('requires a front-facing pose before recognizing attacks', () => {
   Object.assign(pose[15], { z: -0.22 });
   const result = classifyPose(pose);
   assert.equal(result.facingCamera, false);
-  assert.equal(result.punch, false);
-  assert.equal(result.kick, false);
+  assert.equal(result.leftPunch, false);
 });
 
 test('accepts a front-facing pose with a narrow camera crop', () => {
@@ -42,64 +41,73 @@ test('accepts a front-facing pose with a narrow camera crop', () => {
   assert.equal(classifyPose(pose).facingCamera, true);
 });
 
-test('recognizes a front-facing fist extended toward the camera', () => {
-  const pose = standingPose();
-  Object.assign(pose[13], { z: -0.05 });
-  Object.assign(pose[15], { z: -0.22 });
-  assert.equal(classifyPose(pose).punch, true);
+test('distinguishes left and right straight punches', () => {
+  const leftPose = standingPose();
+  Object.assign(leftPose[13], { z: -0.05 });
+  Object.assign(leftPose[15], { z: -0.22 });
+  assert.equal(classifyPose(leftPose).leftPunch, true);
+  assert.equal(classifyPose(leftPose).rightPunch, false);
+
+  const rightPose = standingPose();
+  Object.assign(rightPose[14], { z: -0.05 });
+  Object.assign(rightPose[16], { z: -0.22 });
+  assert.equal(classifyPose(rightPose).leftPunch, false);
+  assert.equal(classifyPose(rightPose).rightPunch, true);
 });
 
-test('recognizes a front-facing foot extended toward the camera', () => {
-  const pose = standingPose();
-  Object.assign(pose[25], { z: -0.03 });
-  Object.assign(pose[27], { z: -0.2 });
-  assert.equal(classifyPose(pose).kick, true);
+test('distinguishes left and right front kicks', () => {
+  const leftPose = standingPose();
+  Object.assign(leftPose[25], { z: -0.03 });
+  Object.assign(leftPose[27], { z: -0.2 });
+  assert.equal(classifyPose(leftPose).leftKick, true);
+  assert.equal(classifyPose(leftPose).rightKick, false);
+
+  const rightPose = standingPose();
+  Object.assign(rightPose[26], { z: -0.03 });
+  Object.assign(rightPose[28], { z: -0.2 });
+  assert.equal(classifyPose(rightPose).leftKick, false);
+  assert.equal(classifyPose(rightPose).rightKick, true);
 });
 
-test('drops control when essential landmarks are low-confidence', () => {
+test('drops all actions when essential landmarks are low confidence', () => {
   const pose = standingPose();
   pose[11].visibility = 0.2;
   assert.deepEqual(classifyPose(pose), {
-    tracked: false, facingCamera: false, punch: false, kick: false,
+    tracked: false,
+    facingCamera: false,
+    leftPunch: false,
+    rightPunch: false,
+    leftKick: false,
+    rightKick: false,
   });
 });
 
-test('requires repeated frames and suppresses a held gesture', () => {
+test('requires repeated frames and suppresses a held action', () => {
   const gate = createGestureGate({ confirmationFrames: 3, cooldownMs: 650 });
-  assert.equal(gate.observe('punch', true, 0), false);
-  assert.equal(gate.observe('punch', true, 33), false);
-  assert.equal(gate.observe('punch', true, 66), true);
-  assert.equal(gate.observe('punch', true, 99), false);
+  assert.equal(gate.observe('leftPunch', true, 0), false);
+  assert.equal(gate.observe('leftPunch', true, 33), false);
+  assert.equal(gate.observe('leftPunch', true, 66), true);
+  assert.equal(gate.observe('leftPunch', true, 99), false);
 });
 
-test('does not retrigger when a held gesture flickers inactive briefly', () => {
-  const gate = createGestureGate({ confirmationFrames: 3, cooldownMs: 650, releaseFrames: 4 });
-  assert.equal(gate.observe('punch', true, 0), false);
-  assert.equal(gate.observe('punch', true, 33), false);
-  assert.equal(gate.observe('punch', true, 66), true);
-  gate.observe('punch', false, 99);
-  gate.observe('punch', true, 132);
-  assert.equal(gate.observe('punch', true, 165), false);
-  gate.observe('punch', false, 198);
-  gate.observe('punch', false, 231);
-  gate.observe('punch', false, 264);
-  gate.observe('punch', false, 297);
-  assert.equal(gate.observe('punch', true, 1000), false);
-  assert.equal(gate.observe('punch', true, 1033), false);
-  assert.equal(gate.observe('punch', true, 1066), true);
+test('ignores brief tracking flicker during a held action', () => {
+  const gate = createGestureGate({ confirmationFrames: 3, releaseFrames: 4 });
+  assert.equal(gate.observe('leftPunch', true, 0), false);
+  assert.equal(gate.observe('leftPunch', true, 33), false);
+  assert.equal(gate.observe('leftPunch', true, 66), true);
+  gate.observe('leftPunch', false, 99);
+  gate.observe('leftPunch', true, 132);
+  assert.equal(gate.observe('leftPunch', true, 165), false);
 });
 
-test('does not replay an extended gesture immediately after tracking returns', () => {
-  const gate = createGestureGate({ confirmationFrames: 3, cooldownMs: 650 });
+test('requires neutral frames after tracking returns', () => {
+  const gate = createGestureGate({ confirmationFrames: 3 });
   gate.resetForTrackingLoss();
-  assert.equal(gate.observe('kick', true, 1000), false);
-  assert.equal(gate.observe('kick', true, 1033), false);
-  assert.equal(gate.observe('kick', true, 1066), false);
-  gate.observe('kick', false, 1099);
-  gate.observe('kick', false, 1100);
-  gate.observe('kick', false, 1101);
-  gate.observe('kick', false, 1102);
-  assert.equal(gate.observe('kick', true, 1132), false);
-  assert.equal(gate.observe('kick', true, 1165), false);
-  assert.equal(gate.observe('kick', true, 1198), true);
+  assert.equal(gate.observe('rightKick', true, 1000), false);
+  assert.equal(gate.observe('rightKick', true, 1033), false);
+  assert.equal(gate.observe('rightKick', true, 1066), false);
+  for (let time = 1099; time < 1231; time += 33) gate.observe('rightKick', false, time);
+  assert.equal(gate.observe('rightKick', true, 1232), false);
+  assert.equal(gate.observe('rightKick', true, 1265), false);
+  assert.equal(gate.observe('rightKick', true, 1298), true);
 });

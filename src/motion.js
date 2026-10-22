@@ -3,7 +3,12 @@ import { classifyPose, createGestureGate } from './pose-classifier.js';
 const TASKS_VERSION = '1.1.1';
 const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
-const ATTACK_COOLDOWN_MS = 650;
+const ACTION_LABELS = {
+  leftPunch: '左直拳',
+  rightPunch: '右直拳',
+  leftKick: '左腳前踢',
+  rightKick: '右腳前踢',
+};
 
 export function createMotionController({ video, overlay, cameraWindow, status, statusLight, actionState, actionLabel, toggleButton, onAttack }) {
   let stream = null;
@@ -59,7 +64,7 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   const acceptGesture = (active, kind, now) => {
     if (!gestureGate.observe(kind, active, now)) return;
     onAttack(kind);
-    setAction(kind === 'punch' ? '拳擊' : '踢擊');
+    setAction(ACTION_LABELS[kind]);
   };
 
   const loseTracking = () => {
@@ -93,13 +98,13 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
       gestureGate.resetForTrackingLoss();
       setStatus('請正面面向鏡頭');
       actionState.textContent = 'READY';
-      actionLabel.textContent = '面向鏡頭出拳或踢腳';
+      actionLabel.textContent = '面向鏡頭出拳或前踢';
       return;
     }
     setStatus('正面追蹤中', 'ready');
-    const attack = pose.punch ? 'punch' : pose.kick ? 'kick' : null;
-    acceptGesture(attack === 'punch', 'punch', now);
-    acceptGesture(attack === 'kick', 'kick', now);
+    for (const action of Object.keys(ACTION_LABELS)) {
+      acceptGesture(pose[action], action, now);
+    }
   };
 
   const stop = () => {

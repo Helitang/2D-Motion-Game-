@@ -11,8 +11,10 @@ const BATTLE_WORLD_X = 700;
 const INTRO_SPEED = 280;
 
 const ATTACKS = {
-  punch: { damage: 10, range: 72, startup: 90, active: 110, recovery: 250, label: '拳擊' },
-  kick: { damage: 15, range: 104, startup: 150, active: 130, recovery: 330, label: '踢擊' },
+  leftPunch: { recovery: 360, label: '左直拳' },
+  rightPunch: { recovery: 360, label: '右直拳' },
+  leftKick: { recovery: 460, label: '左腳前踢' },
+  rightKick: { recovery: 460, label: '右腳前踢' },
 };
 
 const ui = {
@@ -23,31 +25,43 @@ const ui = {
   state: document.querySelector('#fight-state'),
   message: document.querySelector('#stage-message'),
   pause: document.querySelector('#pause-toggle'),
+  counters: {
+    leftPunch: document.querySelector('#counter-left-punch'),
+    rightPunch: document.querySelector('#counter-right-punch'),
+    leftKick: document.querySelector('#counter-left-kick'),
+    rightKick: document.querySelector('#counter-right-kick'),
+  },
 };
 
 function makeFighter(scene, x, palette, isPlayer) {
   const shadow = scene.add.ellipse(0, 1, 62, 15, 0x172823, 0.26);
   const cloak = scene.add.triangle(-6, -48, -18, 0, 20, 0, 9, 44, palette.cloak).setOrigin(0.5, 0.5);
-  const rearLeg = scene.add.rectangle(-9, -16, 12, 32, palette.legs).setOrigin(0.5, 0.5);
-  const frontLeg = scene.add.container(8, -30);
-  frontLeg.add([
-    scene.add.rectangle(0, 16, 15, 34, palette.legs).setOrigin(0.5, 0.08),
-    scene.add.rectangle(8, 33, 25, 8, palette.boots),
-  ]);
+  const makeLeg = (offsetX) => {
+    const leg = scene.add.container(offsetX, -30);
+    leg.add([
+      scene.add.rectangle(0, 16, 14, 36, palette.legs).setOrigin(0.5, 0.08),
+      scene.add.rectangle(8, 35, 26, 8, palette.boots),
+    ]);
+    return leg;
+  };
+  const leftLeg = makeLeg(-8);
+  const rightLeg = makeLeg(8);
   const torso = scene.add.rectangle(0, -53, 42, 48, palette.torso).setOrigin(0.5, 0.5);
   const sash = scene.add.rectangle(0, -40, 43, 7, palette.trim).setOrigin(0.5, 0.5);
   const head = scene.add.circle(0, -88, 17, palette.head);
   const hair = scene.add.ellipse(0, -100, 34, 14, palette.hair);
   const face = scene.add.ellipse(isPlayer ? 5 : -5, -88, 4, 7, 0xe6c59b);
-  const arm = scene.add.rectangle(22, -55, 34, 11, palette.torso).setOrigin(0.12, 0.5);
-  const fist = scene.add.circle(54, -53, 8, palette.trim);
-  const figure = scene.add.container(x, FLOOR_Y - 2, [shadow, cloak, rearLeg, frontLeg, torso, sash, head, hair, face, arm, fist]);
+  const makeArm = (offsetX, offsetY) => scene.add.container(offsetX, offsetY, [
+    scene.add.rectangle(17, 0, 34, 11, palette.torso).setOrigin(0.12, 0.5),
+    scene.add.circle(43, 0, 8, palette.trim),
+  ]);
+  const leftArm = makeArm(-5, -62);
+  const rightArm = makeArm(5, -48);
+  const figure = scene.add.container(x, FLOOR_Y - 2, [shadow, cloak, leftLeg, rightLeg, torso, sash, head, hair, face, leftArm, rightArm]);
   figure.setDepth(4);
   return {
     figure,
-    arm,
-    fist,
-    frontLeg,
+    limbs: { leftArm, rightArm, leftLeg, rightLeg },
     hp: isPlayer ? PLAYER_MAX_HP : ENEMY_MAX_HP,
     maxHp: isPlayer ? PLAYER_MAX_HP : ENEMY_MAX_HP,
     facing: isPlayer ? 1 : -1,
@@ -70,7 +84,7 @@ class ArenaScene extends Phaser.Scene {
   }
 
   create() {
-    this.enemyState = 'approach';
+    this.enemyState = 'idle';
     this.enemyTimer = 0;
     this.enemyAttackElapsed = 0;
     this.enemyHasHit = false;
@@ -78,7 +92,9 @@ class ArenaScene extends Phaser.Scene {
     this.ended = false;
     this.battleStarted = false;
     this.messageTime = 0;
-    ui.message.textContent = '— 尋找破綻 —';
+    this.attackCounts = Object.fromEntries(Object.keys(ATTACKS).map((action) => [action, 0]));
+    for (const [action, counter] of Object.entries(ui.counters)) counter.textContent = '0';
+    ui.message.textContent = '— 動作驗證中 —';
     ui.pause.textContent = 'Ⅱ';
     ui.pause.setAttribute('aria-label', '暫停');
     this.drawWorld();
@@ -147,28 +163,27 @@ class ArenaScene extends Phaser.Scene {
     if (this.paused || this.ended || this.player.attack) return;
     const spec = ATTACKS[type];
     if (!spec) return;
-    this.player.attack = { type, spec, elapsed: 0, hit: false };
+    this.player.attack = { type, spec, elapsed: 0 };
     this.player.state = 'attack';
-    if (type === 'kick') {
-      this.player.frontLeg.angle = -52;
-      this.tweens.add({ targets: this.player.frontLeg, angle: 0, duration: 260, ease: 'Quad.Out' });
+    const limbKey = type.endsWith('Punch') ? type.replace('Punch', 'Arm') : type.replace('Kick', 'Leg');
+    const limb = this.player.limbs[limbKey];
+    if (type.endsWith('Kick')) {
+      limb.angle = -52;
+      this.tweens.add({ targets: limb, angle: 0, duration: 300, ease: 'Quad.Out' });
     } else {
-      this.player.arm.rotation = -0.62;
-      this.player.fist.x = 62;
+      const homeX = limb.x;
+      limb.angle = -24;
       this.tweens.add({
-        targets: this.player.arm,
-        rotation: 0,
-        duration: 220,
+        targets: limb,
+        x: homeX + 12,
+        angle: 0,
+        duration: 230,
         ease: 'Quad.Out',
       });
-      this.tweens.add({
-        targets: this.player.fist,
-        x: 54,
-        delay: 40,
-        duration: 180,
-        ease: 'Quad.Out',
-      });
+      this.tweens.add({ targets: limb, x: homeX, delay: 230, duration: 120, ease: 'Quad.Out' });
     }
+    this.attackCounts[type] += 1;
+    ui.counters[type].textContent = String(this.attackCounts[type]);
     this.showMessage(spec.label, 650);
   }
 
@@ -176,21 +191,11 @@ class ArenaScene extends Phaser.Scene {
     const attack = this.player.attack;
     if (!attack) return;
     attack.elapsed += delta;
-    const activeStart = attack.spec.startup;
-    const activeEnd = activeStart + attack.spec.active;
-    if (!attack.hit && attack.elapsed >= activeStart && attack.elapsed < activeEnd) {
-      const distance = this.enemy.figure.x - this.player.figure.x;
-      const facingTarget = distance > 0;
-      if (this.enemy.hp > 0 && facingTarget && Math.abs(distance) <= attack.spec.range + 26) {
-        attack.hit = true;
-        this.damageEnemy(attack.spec.damage);
-      }
-    }
-    if (attack.elapsed >= activeEnd + attack.spec.recovery) {
+    if (attack.elapsed >= attack.spec.recovery) {
       this.player.attack = null;
-      this.player.arm.rotation = 0;
-      this.player.fist.x = 54;
-      this.player.frontLeg.angle = 0;
+      for (const limb of Object.values(this.player.limbs)) {
+        limb.angle = 0;
+      }
       this.player.state = 'idle';
     }
   }
@@ -286,7 +291,7 @@ class ArenaScene extends Phaser.Scene {
     ui.enemyHealth.style.width = `${this.enemy.hp / this.enemy.maxHp * 100}%`;
     ui.playerHpLabel.textContent = `${this.player.hp} / ${this.player.maxHp}`;
     ui.enemyHpLabel.textContent = `${this.enemy.hp} / ${this.enemy.maxHp}`;
-    ui.state.textContent = this.paused ? '暫停中' : this.enemy.hp === 0 ? '勝利' : this.player.hp === 0 ? '戰敗' : this.battleStarted ? '迎戰中' : '入場中';
+    ui.state.textContent = this.paused ? '暫停中' : this.battleStarted ? '動作驗證' : '入場中';
   }
 
   togglePause() {
@@ -320,11 +325,10 @@ class ArenaScene extends Phaser.Scene {
     }
     this.player.figure.setScale(1, 1);
     this.updatePlayerAttack(delta);
-    this.updateEnemy(delta);
     if (this.player.invulnerable > 0) this.player.invulnerable -= delta;
     if (this.messageTime > 0) {
       this.messageTime -= delta;
-      if (this.messageTime <= 0) ui.message.textContent = this.enemy.hp > 0 ? '— 尋找破綻 —' : '— 戰鬥結束 —';
+      if (this.messageTime <= 0) ui.message.textContent = '— 動作驗證中 —';
     }
   }
 }
@@ -346,7 +350,12 @@ document.querySelector('#restart').addEventListener('click', () => arena()?.rese
 document.querySelectorAll('[data-attack]').forEach((button) => {
   button.addEventListener('click', () => window.dispatchEvent(new CustomEvent('arena-attack', { detail: button.dataset.attack })));
 });
-const attackKeys = { j: 'punch', k: 'kick' };
+const attackKeys = {
+  u: 'leftPunch',
+  i: 'rightPunch',
+  j: 'leftKick',
+  k: 'rightKick',
+};
 
 window.addEventListener('keydown', (event) => {
   const key = event.key.toLowerCase();

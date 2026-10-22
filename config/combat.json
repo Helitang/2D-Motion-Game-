@@ -16,7 +16,8 @@
     "acceleration": null
   },
   "attacks": {
-    "punch": {
+    "left_punch": {
+      "enabled": true,
       "damage": 10,
       "range": null,
       "startup_ms": null,
@@ -24,7 +25,26 @@
       "recovery_ms": null,
       "cooldown_ms": null
     },
-    "kick": {
+    "right_punch": {
+      "enabled": true,
+      "damage": 10,
+      "range": null,
+      "startup_ms": null,
+      "active_ms": null,
+      "recovery_ms": null,
+      "cooldown_ms": null
+    },
+    "left_kick": {
+      "enabled": true,
+      "damage": 15,
+      "range": null,
+      "startup_ms": null,
+      "active_ms": null,
+      "recovery_ms": null,
+      "cooldown_ms": null
+    },
+    "right_kick": {
+      "enabled": true,
       "damage": 15,
       "range": null,
       "startup_ms": null,
@@ -52,6 +72,8 @@
     }
   },
   "enemies": {
+    "enabled": false,
+    "attacks_enabled": false,
     "max_simultaneous_attackers": 1,
     "regular": {
       "max_hp": 100,
@@ -72,10 +94,16 @@
     "primary": "camera_motion_recognition",
     "keyboard_fallback_enabled": true,
     "keyboard": {
-      "punch": [
+      "left_punch": [
+        "U"
+      ],
+      "right_punch": [
+        "I"
+      ],
+      "left_kick": [
         "J"
       ],
-      "kick": [
+      "right_kick": [
         "K"
       ],
       "pause": [
@@ -85,8 +113,10 @@
   },
   "motion_recognition": {
     "required_actions": [
-      "punch",
-      "kick"
+      "left_punch",
+      "right_punch",
+      "left_kick",
+      "right_kick"
     ],
     "optional_actions": [],
     "facing": "camera",
