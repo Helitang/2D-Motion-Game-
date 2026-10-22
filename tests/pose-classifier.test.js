@@ -66,6 +66,14 @@ test('distinguishes left and right straight punches', () => {
   assert.equal(classifyPose(rightPose).rightPunch, true);
 });
 
+test('accepts a slightly bent, lower-confidence right punch without relaxing left-punch rules', () => {
+  const pose = standingPose();
+  Object.assign(pose[14], { x: 0.7, y: 0.34, z: -0.07, visibility: 0.45 });
+  Object.assign(pose[16], { x: 0.82, y: 0.4, z: -0.18, visibility: 0.45 });
+  assert.equal(classifyPose(pose).rightPunch, true);
+  assert.equal(classifyPose(pose).leftPunch, false);
+});
+
 test('requires forward hand motion, not a static extended hand, for punches', () => {
   const detector = createPunchMotionDetector({ windowMs: 220, minimumAdvance: 0.12 });
   for (let time = 0; time <= 440; time += 55) {
@@ -77,6 +85,22 @@ test('requires forward hand motion, not a static extended hand, for punches', ()
   assert.equal(detector.observe('leftPunch', 0.08, false, 80), false);
   assert.equal(detector.observe('leftPunch', 0.19, false, 150), false);
   assert.equal(detector.observe('leftPunch', 0.3, true, 180), true);
+});
+
+test('uses a lower motion threshold only for right punches', () => {
+  const detector = createPunchMotionDetector({
+    windowMs: 220,
+    minimumAdvance: 0.12,
+    minimumAdvanceByAction: { rightPunch: 0.08 },
+  });
+  for (const [time, extension] of [[0, 0], [70, 0.02], [140, 0.1]]) {
+    const active = time === 140;
+    assert.equal(detector.observe('leftPunch', extension, active, time), false);
+  }
+  detector.reset();
+  assert.equal(detector.observe('rightPunch', 0, false, 0), false);
+  assert.equal(detector.observe('rightPunch', 0.02, false, 70), false);
+  assert.equal(detector.observe('rightPunch', 0.1, true, 140), true);
 });
 
 test('distinguishes left and right front kicks', () => {

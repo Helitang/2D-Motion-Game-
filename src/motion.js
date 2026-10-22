@@ -17,7 +17,11 @@ export function createMotionController({ video, overlay, cameraWindow, status, s
   let running = false;
   let lastVideoTime = -1;
   const gestureGate = createGestureGate({ confirmationFrames: 4, cooldownMs: 800, releaseFrames: 8 });
-  const punchMotionDetector = createPunchMotionDetector({ windowMs: 220, minimumAdvance: 0.12 });
+  const punchMotionDetector = createPunchMotionDetector({
+    windowMs: 220,
+    minimumAdvance: 0.12,
+    minimumAdvanceByAction: { rightPunch: 0.08 },
+  });
   let lastActionTimer = 0;
   let lastInferenceAt = 0;
 

@@ -30,6 +30,7 @@ Touch buttons are available in landscape mode. Portrait screens show a rotate-de
 - The preview is black with pose landmarks only; raw camera video is hidden and is not uploaded or stored.
 - Face the camera and use a straight punch or front kick. Left/right actions have independent counters.
 - Punches require forward hand movement; a held or still hand does not count as a new punch.
+- The right-punch detector uses a lower confidence/extension threshold to account for right-arm occlusion; verify its false-trigger rate during camera testing.
 - Enemy AI and damage are paused while validating character actions.
 - Keyboard and touch controls can test all four actions independently.
 

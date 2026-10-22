@@ -63,16 +63,22 @@ export function classifyPose(landmarks) {
     && shoulderSkew <= 0.45 && hipSkew <= 0.45
     && shoulderDepthSkew <= 0.55 && hipDepthSkew <= 0.55;
 
-  const extendedArm = (shoulder, elbow, wrist) => {
-    if (!visible(landmarks, [shoulder, elbow, wrist])) return false;
+  const extendedArm = (shoulder, elbow, wrist, thresholds = {}) => {
+    const {
+      visibility = VISIBILITY_THRESHOLD,
+      depthRatio = 0.28,
+      minimumAngle = 135,
+      lengthRatio = 0.78,
+    } = thresholds;
+    if (!visible(landmarks, [shoulder, elbow, wrist], visibility)) return false;
     const points = [landmarks[shoulder], landmarks[elbow], landmarks[wrist]];
-    return (points[2].z ?? 0) < (points[0].z ?? 0) - torsoHeight * 0.28
-      && angleAt(points[0], points[1], points[2]) >= 135
-      && distance3d(points[0], points[2]) / torsoHeight >= 0.78;
+    return (points[2].z ?? 0) < (points[0].z ?? 0) - torsoHeight * depthRatio
+      && angleAt(points[0], points[1], points[2]) >= minimumAngle
+      && distance3d(points[0], points[2]) / torsoHeight >= lengthRatio;
   };
 
-  const armExtension = (shoulder, wrist) => {
-    if (!visible(landmarks, [shoulder, wrist])) return 0;
+  const armExtension = (shoulder, wrist, visibility = VISIBILITY_THRESHOLD) => {
+    if (!visible(landmarks, [shoulder, wrist], visibility)) return 0;
     return Math.max(0, ((landmarks[shoulder].z ?? 0) - (landmarks[wrist].z ?? 0)) / torsoHeight);
   };
 
@@ -85,15 +91,20 @@ export function classifyPose(landmarks) {
     tracked: true,
     facingCamera,
     leftPunch: facingCamera && extendedArm(11, 13, 15),
-    rightPunch: facingCamera && extendedArm(12, 14, 16),
+    rightPunch: facingCamera && extendedArm(12, 14, 16, {
+      visibility: 0.4,
+      depthRatio: 0.18,
+      minimumAngle: 115,
+      lengthRatio: 0.62,
+    }),
     leftKick: facingCamera && kneeAboveWaist(23, 25),
     rightKick: facingCamera && kneeAboveWaist(24, 26),
     leftPunchExtension: armExtension(11, 15),
-    rightPunchExtension: armExtension(12, 16),
+    rightPunchExtension: armExtension(12, 16, 0.4),
   };
 }
 
-export function createPunchMotionDetector({ windowMs = 220, minimumAdvance = 0.12 } = {}) {
+export function createPunchMotionDetector({ windowMs = 220, minimumAdvance = 0.12, minimumAdvanceByAction = {} } = {}) {
   const history = { leftPunch: [], rightPunch: [] };
 
   return {
@@ -108,7 +119,7 @@ export function createPunchMotionDetector({ windowMs = 220, minimumAdvance = 0.1
       const baseline = samples[0]?.extension;
       samples.push({ time: now, extension });
       if (!poseActive || baseline === undefined) return false;
-      return extension - baseline >= minimumAdvance;
+      return extension - baseline >= (minimumAdvanceByAction[action] ?? minimumAdvance);
     },
   };
 }
